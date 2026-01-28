@@ -33,12 +33,139 @@
 
       <div class="controls">
         <div id="countdown" class="sub" style="font-weight: 600" aria-live="polite" aria-atomic="true"></div>
+        <div id="millennium-indicator" class="hidden millennium-badge">🌌 MILLENNIUM HOUR 🌌</div>
+      </div>
+
+      <div class="toolbar">
+        <button id="random-fact-btn" onclick="showRandomFact()" class="btn">🎲 Random Fact</button>
+        <button onclick="showArchive()" class="btn">📚 Archive</button>
+        <button onclick="showStats()" class="btn">📊 Stats</button>
+        <button onclick="showSettings()" class="btn">⚙️ Settings</button>
       </div>
     </header>
 
     <main>
       <div id="wrap" aria-live="polite" aria-atomic="false"></div>
     </main>
+
+    <!-- Share Modal -->
+    <div id="share-modal" class="modal hidden">
+      <div class="modal-content">
+        <div class="modal-header">
+          <h2>Share This Fact</h2>
+          <button class="close-btn" onclick="closeShareModal()">×</button>
+        </div>
+        <div class="modal-body">
+          <button id="share-twitter" class="btn btn-block">Share on Twitter</button>
+          <button id="share-mastodon" class="btn btn-block">Share on Mastodon</button>
+          <button id="share-copy" class="btn btn-block">Copy Link</button>
+        </div>
+      </div>
+    </div>
+
+    <!-- Archive Modal -->
+    <div id="archive-modal" class="modal hidden">
+      <div class="modal-content modal-large">
+        <div class="modal-header">
+          <h2>Fact Archive</h2>
+          <button class="close-btn" onclick="closeArchive()">×</button>
+        </div>
+        <div class="modal-body">
+          <input
+            type="text"
+            id="archive-search"
+            placeholder="Search facts..."
+            class="search-input"
+            oninput="showArchive()"
+          />
+          <div id="archive-content" class="archive-content"></div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Stats Modal -->
+    <div id="stats-modal" class="modal hidden">
+      <div class="modal-content">
+        <div class="modal-header">
+          <h2>Your Statistics</h2>
+          <button class="close-btn" onclick="closeStats()">×</button>
+        </div>
+        <div class="modal-body">
+          <div class="stat-item">
+            <span class="stat-label">Facts Seen:</span>
+            <span id="stat-seen" class="stat-value">0 / 365</span>
+          </div>
+          <div class="stat-item">
+            <span class="stat-label">Favorites:</span>
+            <span id="stat-favorites" class="stat-value">0</span>
+          </div>
+          <div class="stat-item">
+            <span class="stat-label">Total Time:</span>
+            <span id="stat-time" class="stat-value">0s</span>
+          </div>
+          <div class="stat-item">
+            <span class="stat-label">Streak:</span>
+            <span id="stat-streak" class="stat-value">0 days</span>
+          </div>
+          <div class="stat-item">
+            <span class="stat-label">Philip Exposure:</span>
+            <span id="stat-philip" class="stat-value">92%</span>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Settings Modal -->
+    <div id="settings-modal" class="modal hidden">
+      <div class="modal-content">
+        <div class="modal-header">
+          <h2>Settings</h2>
+          <button class="close-btn" onclick="closeSettings()">×</button>
+        </div>
+        <div class="modal-body">
+          <div class="setting-item">
+            <label for="sound-toggle">
+              <span>🔊 Sound Effects</span>
+              <input type="checkbox" id="sound-toggle" onchange="toggleSound()" />
+            </label>
+          </div>
+
+          <div class="setting-item">
+            <label for="philip-slider">
+              <span>🐟 Philip Intensity: <span id="philip-value">92%</span></span>
+            </label>
+            <input
+              type="range"
+              id="philip-slider"
+              min="0"
+              max="100"
+              value="92"
+              oninput="updatePhilipIntensity(this.value)"
+              class="slider"
+            />
+            <div class="slider-labels">
+              <span>Just Facts</span>
+              <span>Maximum Philip</span>
+            </div>
+          </div>
+
+          <div class="setting-item">
+            <label for="theme-select">
+              <span>🎨 Theme</span>
+            </label>
+            <select id="theme-select" onchange="changeTheme(this.value)" class="theme-select">
+              <option value="default">Default Ocean</option>
+              <option value="deep-sea">Deep Sea</option>
+              <option value="coral-reef">Coral Reef</option>
+              <option value="arctic">Arctic Waters</option>
+              <option value="philip">Philip Mode</option>
+              <option value="salmon">Salmon</option>
+              <option value="shark">Shark</option>
+            </select>
+          </div>
+        </div>
+      </div>
+    </div>
 
     <script src="script.js"></script>
   </body>

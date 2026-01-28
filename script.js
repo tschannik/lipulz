@@ -1,15 +1,61 @@
 // Constants
-const STATE_VERSION = 1;
+const STATE_VERSION = 2; // Bumped for new features
 const HOUR_MS = 60 * 60 * 1000;
 const COUNTDOWN_UPDATE_INTERVAL_MS = 1000;
+const RANDOM_FACT_COOLDOWN_MS = 5 * 60 * 1000; // 5 minutes
+const MILLENNIUM_FACT_INTERVAL_HOURS = 1000;
 
 // Probability thresholds for content generation
-const PHILIP_FREQUENCY = 0.92;
+const DEFAULT_PHILIP_FREQUENCY = 0.92;
 const PUN_FREQUENCY = 0.55;
 const SPICE_FREQUENCY = 0.35;
 
 // Emoji pool for fact signatures
 const FACT_EMOJIS = ['🫧', '🐟', '🐠', '🐡', '🌊', '🪸', '🦈'];
+
+// Ultra-rare Philip facts (Easter eggs)
+const ULTRA_PHILIP_FACTS = [
+  {
+    tag: 'Philip Lore',
+    text: '🎭 ULTRA RARE: Philip once convinced an entire aquarium that he was their manager. He lasted 3 hours before someone asked for credentials.',
+  },
+  {
+    tag: 'Philip Legend',
+    text: '✨ LEGENDARY: Philip claims he can speak to fish. The fish have filed a restraining order.',
+  },
+  {
+    tag: 'Philip Mystery',
+    text: '🌟 MYTHICAL: Scientists discovered a new fish species and Philip immediately trademarked the name "Phil-tropicalis". The scientists were not amused.',
+  },
+];
+
+// Special date facts
+const SPECIAL_DATE_FACTS = {
+  '04-01': {
+    tag: 'April Fools',
+    text: '🃏 Fish are actually just underwater birds that forgot how to fly. Philip insists this is peer-reviewed.',
+  },
+  '02-14': {
+    tag: 'Valentine\'s',
+    text: '💕 Clownfish are monogamous and mate for life. Philip tried this approach. He is now banned from three dating apps.',
+  },
+  '10-31': {
+    tag: 'Spooky',
+    text: '👻 Deep sea fish look terrifying because they evolved in darkness. Philip looks terrifying because he cuts his own hair.',
+  },
+};
+
+// The legendary Millennium Fact
+const MILLENNIUM_FACT = {
+  tag: 'MILLENNIUM',
+  text: '🌌 THE PROPHECY HAS BEEN FULFILLED: Philip has finally understood what fish are. Just kidding, he still thinks they\'re "wet puppies". This fact only appears once every 1000 hours. You are blessed. Or cursed. Hard to say.',
+};
+
+// Sound effects as data URIs
+const SOUNDS = {
+  bubble: 'data:audio/wav;base64,UklGRjIAAABXQVZFZm10IBIAAAABAAEAQB8AAEAfAAABAAgAAABmYWN0BAAAAAAAAABkYXRhAAAAAA==',
+  bloop: 'data:audio/wav;base64,UklGRjIAAABXQVZFZm10IBIAAAABAAEAQB8AAEAfAAABAAgAAABmYWN0BAAAAAAAAABkYXRhAAAAAA==',
+};
 
 // A tiny deterministic PRNG so "reshuffle" feels different but stable per seed.
 function mulberry32(seed) {
@@ -24,7 +70,6 @@ function mulberry32(seed) {
 }
 
 const BASE_FACTS = [
-  // Real / real-ish fish facts (kept short). We'll remix them into 365 variations.
   { tag: 'Biology', text: 'Many fish use their lateral line to sense tiny vibrations in water.' },
   { tag: 'Oddity', text: 'Some fish can produce sounds by grinding teeth or vibrating muscles.' },
   { tag: 'Adaptation', text: 'Camouflage in fish is often about breaking up outlines, not turning invisible.' },
@@ -33,23 +78,14 @@ const BASE_FACTS = [
   { tag: 'Reef life', text: 'Cleaner fish eat parasites off larger fish, a tiny spa day under the sea.' },
   { tag: 'Survival', text: 'Some fish tolerate low oxygen by slowing metabolism or gulping air.' },
   { tag: 'Weird flex', text: 'Seahorses are fish, and the males carry the babies.' },
-  {
-    tag: 'Fun anatomy',
-    text: 'Fish gills are efficient at extracting oxygen from water, which has far less O₂ than air.',
-  },
+  { tag: 'Fun anatomy', text: 'Fish gills are efficient at extracting oxygen from water, which has far less O₂ than air.' },
   { tag: 'Navigation', text: 'Some fish can sense Earth's magnetic field for long-distance navigation.' },
   { tag: 'Speed', text: 'Streamlined bodies and powerful tails help fast fish reduce drag.' },
   { tag: 'Senses', text: 'Many sharks can detect weak electric fields from muscle movements.' },
   { tag: 'Growth', text: 'Fish scales can show growth rings, a bit like underwater tree trivia.' },
-  {
-    tag: 'Communication',
-    text: 'Color changes in fish can signal mood, territory, or 'please stop nibbling me'.',
-  },
+  { tag: 'Communication', text: 'Color changes in fish can signal mood, territory, or 'please stop nibbling me'.' },
   { tag: 'Habitat', text: 'Freshwater fish and saltwater fish manage water balance in opposite ways.' },
-  {
-    tag: 'Parenting',
-    text: 'Some fish guard eggs aggressively; others go with the 'hope for the best' strategy.',
-  },
+  { tag: 'Parenting', text: 'Some fish guard eggs aggressively; others go with the 'hope for the best' strategy.' },
   { tag: 'Diet', text: 'Not all fish eat smaller fish: many graze algae, plankton, or tiny invertebrates.' },
   { tag: 'Temperature', text: 'Most fish are ectotherms, so water temperature strongly affects their activity.' },
   { tag: 'Shape', text: 'Flatfish start life symmetrical and later one eye migrates to the other side.' },
@@ -113,7 +149,7 @@ function pick(rng, arr) {
   return arr[Math.floor(rng() * arr.length)];
 }
 
-function remixFact(rng, base) {
+function remixFact(rng, base, philipIntensity = DEFAULT_PHILIP_FREQUENCY) {
   const openers = [
     'Fish fact:',
     'Underwater update:',
@@ -134,7 +170,7 @@ function remixFact(rng, base) {
   ];
 
   const t = pick(rng, tweaks)(base.text);
-  const addPhilip = rng() < PHILIP_FREQUENCY;
+  const addPhilip = rng() < philipIntensity;
   const addPun = rng() < PUN_FREQUENCY;
   const addSpice = rng() < SPICE_FREQUENCY;
 
@@ -145,18 +181,18 @@ function remixFact(rng, base) {
   return out;
 }
 
-// Optimized: Generate only the fact we need, not all 365
-function generateSingleFact(seed, factNumber) {
+// Generate only the fact we need
+function generateSingleFact(seed, factNumber, philipIntensity = DEFAULT_PHILIP_FREQUENCY) {
   const rng = mulberry32(seed);
 
-  // Advance RNG to the correct position for this fact number
+  // Advance RNG to the correct position
   for (let i = 0; i < factNumber; i++) {
-    rng(); // Skip ahead
-    rng(); // For emoji selection
+    rng();
+    rng();
   }
 
   const base = BASE_FACTS[Math.floor(rng() * BASE_FACTS.length)];
-  const text = remixFact(rng, base);
+  const text = remixFact(rng, base, philipIntensity);
   const signature = FACT_EMOJIS[Math.floor(rng() * FACT_EMOJIS.length)];
 
   return {
@@ -166,6 +202,28 @@ function generateSingleFact(seed, factNumber) {
   };
 }
 
+// Check if it's time for the Millennium Fact
+function isMillenniumHour() {
+  const hoursSinceEpoch = Math.floor(Date.now() / HOUR_MS);
+  return hoursSinceEpoch % MILLENNIUM_FACT_INTERVAL_HOURS === 0;
+}
+
+// Get special fact for today's date
+function getSpecialDateFact() {
+  const now = new Date();
+  const key = `${String(now.getMonth() + 1).padStart(2, '0')}-${String(now.getDate()).padStart(2, '0')}`;
+  return SPECIAL_DATE_FACTS[key];
+}
+
+// Check for ultra-rare Philip fact (1% chance)
+function getUltraPhilipFact(rng) {
+  if (rng() < 0.01) {
+    return ULTRA_PHILIP_FACTS[Math.floor(rng() * ULTRA_PHILIP_FACTS.length)];
+  }
+  return null;
+}
+
+// State management
 const wrap = document.getElementById('wrap');
 const countdownEl = document.getElementById('countdown');
 
@@ -173,6 +231,22 @@ let seed = Date.now() >>> 0;
 let currentFactIndex = 0;
 let factGeneratedAt = Date.now();
 let timerInterval = null;
+let settings = {
+  soundEnabled: false,
+  philipIntensity: DEFAULT_PHILIP_FREQUENCY,
+  theme: 'default',
+};
+let stats = {
+  factsSeen: [],
+  favorites: [],
+  totalTimeMs: 0,
+  lastVisit: Date.now(),
+  streak: 0,
+  sessionStart: Date.now(),
+};
+let randomFactCooldownUntil = 0;
+let konamiCode = [];
+let millenniumFactShown = false;
 
 function getHourStart() {
   const now = new Date();
@@ -190,11 +264,14 @@ function saveState() {
       factIndex: currentFactIndex,
       seed: seed,
       hourStart: factGeneratedAt,
+      settings: settings,
+      stats: stats,
+      randomFactCooldownUntil: randomFactCooldownUntil,
+      millenniumFactShown: millenniumFactShown,
     };
     localStorage.setItem('fishFactsState', JSON.stringify(state));
   } catch (e) {
     console.warn('Failed to save state to localStorage:', e);
-    // Silently fail - the app will still work without persistence
   }
 }
 
@@ -204,33 +281,79 @@ function loadState() {
 
     if (!savedState) {
       generateNewFact();
+      updateStreak();
       return;
     }
 
     const state = JSON.parse(savedState);
     const currentHourStart = getHourStart();
 
-    // Validate state version and check if we're in the same hour
-    if (state.version === STATE_VERSION && state.hourStart === currentHourStart) {
+    // Migrate from older versions
+    if (state.version < STATE_VERSION) {
+      console.log('Migrating state from version', state.version, 'to', STATE_VERSION);
+      // Initialize new fields with defaults
+      if (!state.settings) state.settings = settings;
+      if (!state.stats) state.stats = stats;
+    }
+
+    // Restore settings and stats
+    settings = { ...settings, ...state.settings };
+    stats = { ...stats, ...state.stats };
+    randomFactCooldownUntil = state.randomFactCooldownUntil || 0;
+    millenniumFactShown = state.millenniumFactShown || false;
+
+    // Check if we're in the same hour
+    if (state.hourStart === currentHourStart) {
       currentFactIndex = state.factIndex;
       seed = state.seed;
       factGeneratedAt = state.hourStart;
-      return;
+    } else {
+      generateNewFact();
     }
 
-    // Generate new fact for new hour or invalid state
-    generateNewFact();
+    updateStreak();
+    applyTheme(settings.theme);
   } catch (e) {
     console.warn('Failed to load state from localStorage:', e);
     generateNewFact();
+    updateStreak();
   }
 }
 
 function generateNewFact() {
+  // Check for Millennium Fact first
+  if (isMillenniumHour() && !millenniumFactShown) {
+    // Special handling for millennium fact
+    currentFactIndex = -1; // Special marker
+    millenniumFactShown = true;
+    factGeneratedAt = getHourStart();
+    seed = Date.now() >>> 0;
+    saveState();
+    return;
+  }
+
+  millenniumFactShown = false; // Reset for next millennium
   seed = Date.now() >>> 0;
   currentFactIndex = Math.floor(Math.random() * 365);
   factGeneratedAt = getHourStart();
   saveState();
+}
+
+function updateStreak() {
+  const now = Date.now();
+  const lastVisitDate = new Date(stats.lastVisit).toDateString();
+  const todayDate = new Date(now).toDateString();
+
+  if (lastVisitDate !== todayDate) {
+    const dayDiff = Math.floor((now - stats.lastVisit) / (24 * 60 * 60 * 1000));
+    if (dayDiff === 1) {
+      stats.streak += 1;
+    } else if (dayDiff > 1) {
+      stats.streak = 1;
+    }
+    stats.lastVisit = now;
+    saveState();
+  }
 }
 
 function formatTime(ms) {
@@ -248,6 +371,17 @@ function formatTime(ms) {
   }
 }
 
+function playSound(soundName) {
+  if (!settings.soundEnabled) return;
+  try {
+    const audio = new Audio(SOUNDS[soundName] || SOUNDS.bubble);
+    audio.volume = 0.3;
+    audio.play().catch(e => console.warn('Sound play failed:', e));
+  } catch (e) {
+    console.warn('Sound error:', e);
+  }
+}
+
 function updateCountdown() {
   const now = Date.now();
   const nextHourStart = new Date(now);
@@ -257,30 +391,82 @@ function updateCountdown() {
   nextHourStart.setMilliseconds(0);
 
   const remaining = Math.max(0, nextHourStart.getTime() - now);
-
   countdownEl.textContent = `Next fact in: ${formatTime(remaining)}`;
 
+  // Check if millennium fact countdown is relevant
+  if (isMillenniumHour() && !millenniumFactShown) {
+    const millenniumIndicator = document.getElementById('millennium-indicator');
+    if (millenniumIndicator) {
+      millenniumIndicator.classList.remove('hidden');
+    }
+  }
+
   if (remaining === 0) {
-    // Generate new fact for the new hour
     generateNewFact();
+    playSound('bloop');
     render();
   }
 }
 
+function getCurrentFact() {
+  // Check for Millennium Fact
+  if (currentFactIndex === -1) {
+    return {
+      n: 1000,
+      tag: MILLENNIUM_FACT.tag,
+      text: MILLENNIUM_FACT.text,
+      isMillennium: true,
+    };
+  }
+
+  // Check for special date fact
+  const specialFact = getSpecialDateFact();
+  if (specialFact) {
+    return {
+      n: currentFactIndex + 1,
+      tag: specialFact.tag,
+      text: specialFact.text,
+      isSpecial: true,
+    };
+  }
+
+  // Check for ultra-rare Philip fact
+  const rng = mulberry32(seed + currentFactIndex);
+  const ultraFact = getUltraPhilipFact(rng);
+  if (ultraFact) {
+    return {
+      n: currentFactIndex + 1,
+      tag: ultraFact.tag,
+      text: ultraFact.text,
+      isUltra: true,
+    };
+  }
+
+  // Regular fact
+  return generateSingleFact(seed, currentFactIndex, settings.philipIntensity);
+}
+
 function render() {
   wrap.innerHTML = '';
-  const f = generateSingleFact(seed, currentFactIndex);
+  const f = getCurrentFact();
+
+  // Track fact in stats
+  if (!stats.factsSeen.includes(f.n)) {
+    stats.factsSeen.push(f.n);
+    saveState();
+  }
 
   if (f) {
     const card = document.createElement('section');
     card.className = 'card';
+    if (f.isMillennium) card.classList.add('millennium-card');
+    if (f.isUltra) card.classList.add('ultra-card');
 
     // Extract emoji from start of text
     const emojiMatch = f.text.match(/^(\p{Emoji_Presentation}|\p{Extended_Pictographic})\s*/u);
     const emoji = emojiMatch ? emojiMatch[1] : '🐟';
     const textWithoutEmoji = f.text.substring(emoji.length).trim();
 
-    // Create elements for better security
     const metaDiv = document.createElement('div');
     metaDiv.className = 'meta';
 
@@ -292,8 +478,24 @@ function render() {
     tagSpan.className = 'tag';
     tagSpan.textContent = f.tag;
 
+    // Favorite button
+    const favBtn = document.createElement('button');
+    favBtn.className = 'fav-btn';
+    favBtn.innerHTML = stats.favorites.includes(f.n) ? '⭐' : '☆';
+    favBtn.title = 'Toggle favorite';
+    favBtn.onclick = () => toggleFavorite(f.n);
+
+    // Share button
+    const shareBtn = document.createElement('button');
+    shareBtn.className = 'share-btn';
+    shareBtn.innerHTML = '🔗';
+    shareBtn.title = 'Share';
+    shareBtn.onclick = () => showShareModal(f);
+
     metaDiv.appendChild(numSpan);
     metaDiv.appendChild(tagSpan);
+    metaDiv.appendChild(favBtn);
+    metaDiv.appendChild(shareBtn);
 
     const contentDiv = document.createElement('div');
     contentDiv.style.display = 'flex';
@@ -320,9 +522,263 @@ function render() {
     card.appendChild(tinyDiv);
 
     wrap.appendChild(card);
+
+    // Update URL hash for permalink
+    updatePermalink(f.n);
   }
 
   updateCountdown();
+  updateStatsDisplay();
+}
+
+function toggleFavorite(factNum) {
+  const idx = stats.favorites.indexOf(factNum);
+  if (idx > -1) {
+    stats.favorites.splice(idx, 1);
+  } else {
+    stats.favorites.push(factNum);
+  }
+  saveState();
+  render();
+}
+
+function updatePermalink(factNum) {
+  const newHash = `#fact-${factNum}`;
+  if (window.location.hash !== newHash) {
+    history.replaceState(null, '', newHash);
+  }
+}
+
+function loadFromPermalink() {
+  const hash = window.location.hash;
+  if (hash.startsWith('#fact-')) {
+    const factNum = parseInt(hash.substring(6));
+    if (factNum >= 1 && factNum <= 365) {
+      currentFactIndex = factNum - 1;
+      render();
+    }
+  } else if (hash === '#konami') {
+    activateKonamiMode();
+  }
+}
+
+// Share modal functionality
+function showShareModal(fact) {
+  const modal = document.getElementById('share-modal');
+  const factText = fact.text.replace(/^(\p{Emoji_Presentation}|\p{Extended_Pictographic})\s*/u, '');
+  const url = `${window.location.origin}${window.location.pathname}#fact-${fact.n}`;
+
+  document.getElementById('share-twitter').onclick = () => {
+    const text = encodeURIComponent(`${factText}\n\n#FishFacts`);
+    window.open(`https://twitter.com/intent/tweet?text=${text}&url=${encodeURIComponent(url)}`, '_blank');
+  };
+
+  document.getElementById('share-mastodon').onclick = () => {
+    const text = encodeURIComponent(`${factText}\n\n${url}`);
+    const instance = prompt('Enter your Mastodon instance (e.g., mastodon.social):');
+    if (instance) {
+      window.open(`https://${instance}/share?text=${text}`, '_blank');
+    }
+  };
+
+  document.getElementById('share-copy').onclick = () => {
+    navigator.clipboard.writeText(`${factText}\n\n${url}`).then(() => {
+      alert('Copied to clipboard!');
+      modal.classList.add('hidden');
+    });
+  };
+
+  modal.classList.remove('hidden');
+}
+
+function closeShareModal() {
+  document.getElementById('share-modal').classList.add('hidden');
+}
+
+// Random fact with cooldown
+function showRandomFact() {
+  const now = Date.now();
+  if (now < randomFactCooldownUntil) {
+    const remaining = Math.ceil((randomFactCooldownUntil - now) / 1000);
+    alert(`Please wait ${remaining} seconds before generating another random fact.`);
+    return;
+  }
+
+  currentFactIndex = Math.floor(Math.random() * 365);
+  randomFactCooldownUntil = now + RANDOM_FACT_COOLDOWN_MS;
+  playSound('bloop');
+  saveState();
+  render();
+  updateRandomButtonState();
+}
+
+function updateRandomButtonState() {
+  const btn = document.getElementById('random-fact-btn');
+  const now = Date.now();
+  if (now < randomFactCooldownUntil) {
+    btn.disabled = true;
+    btn.textContent = `Cooldown: ${Math.ceil((randomFactCooldownUntil - now) / 1000)}s`;
+    setTimeout(updateRandomButtonState, 1000);
+  } else {
+    btn.disabled = false;
+    btn.textContent = '🎲 Random Fact';
+  }
+}
+
+// Archive modal
+function showArchive() {
+  const modal = document.getElementById('archive-modal');
+  const archiveContent = document.getElementById('archive-content');
+  archiveContent.innerHTML = '';
+
+  const search = document.getElementById('archive-search').value.toLowerCase();
+
+  // Show all facts
+  for (let i = 0; i < 365; i++) {
+    const fact = generateSingleFact(seed, i, settings.philipIntensity);
+    const factText = fact.text.toLowerCase();
+
+    if (search && !factText.includes(search) && !fact.tag.toLowerCase().includes(search)) {
+      continue;
+    }
+
+    const item = document.createElement('div');
+    item.className = 'archive-item';
+    if (stats.factsSeen.includes(fact.n)) item.classList.add('seen');
+    if (stats.favorites.includes(fact.n)) item.classList.add('favorite');
+
+    const header = document.createElement('div');
+    header.style.display = 'flex';
+    header.style.justifyContent = 'space-between';
+    header.style.marginBottom = '8px';
+
+    const title = document.createElement('strong');
+    title.textContent = `#${String(fact.n).padStart(3, '0')} - ${fact.tag}`;
+
+    const favIcon = document.createElement('span');
+    favIcon.textContent = stats.favorites.includes(fact.n) ? '⭐' : '';
+    favIcon.style.cursor = 'pointer';
+    favIcon.onclick = () => {
+      toggleFavorite(fact.n);
+      showArchive();
+    };
+
+    header.appendChild(title);
+    header.appendChild(favIcon);
+
+    const text = document.createElement('p');
+    text.textContent = fact.text;
+    text.style.margin = '0';
+    text.style.fontSize = '0.9rem';
+
+    const viewBtn = document.createElement('button');
+    viewBtn.textContent = 'View';
+    viewBtn.className = 'btn-small';
+    viewBtn.style.marginTop = '8px';
+    viewBtn.onclick = () => {
+      currentFactIndex = i;
+      render();
+      closeArchive();
+    };
+
+    item.appendChild(header);
+    item.appendChild(text);
+    item.appendChild(viewBtn);
+
+    archiveContent.appendChild(item);
+  }
+
+  modal.classList.remove('hidden');
+}
+
+function closeArchive() {
+  document.getElementById('archive-modal').classList.add('hidden');
+}
+
+// Stats modal
+function showStats() {
+  const modal = document.getElementById('stats-modal');
+  modal.classList.remove('hidden');
+  updateStatsDisplay();
+}
+
+function closeStats() {
+  document.getElementById('stats-modal').classList.add('hidden');
+}
+
+function updateStatsDisplay() {
+  const totalSeen = stats.factsSeen.length;
+  const totalFavorites = stats.favorites.length;
+  const sessionTime = Date.now() - stats.sessionStart;
+  const totalTime = stats.totalTimeMs + sessionTime;
+  const philipExposure = Math.round(settings.philipIntensity * 100);
+
+  document.getElementById('stat-seen').textContent = `${totalSeen} / 365`;
+  document.getElementById('stat-favorites').textContent = totalFavorites;
+  document.getElementById('stat-time').textContent = formatTime(totalTime);
+  document.getElementById('stat-streak').textContent = `${stats.streak} days`;
+  document.getElementById('stat-philip').textContent = `${philipExposure}%`;
+}
+
+// Settings modal
+function showSettings() {
+  const modal = document.getElementById('settings-modal');
+  document.getElementById('sound-toggle').checked = settings.soundEnabled;
+  document.getElementById('philip-slider').value = settings.philipIntensity * 100;
+  document.getElementById('philip-value').textContent = `${Math.round(settings.philipIntensity * 100)}%`;
+  document.getElementById('theme-select').value = settings.theme;
+  modal.classList.remove('hidden');
+}
+
+function closeSettings() {
+  document.getElementById('settings-modal').classList.add('hidden');
+  saveState();
+}
+
+function updatePhilipIntensity(value) {
+  settings.philipIntensity = value / 100;
+  document.getElementById('philip-value').textContent = `${Math.round(value)}%`;
+  // Regenerate current fact with new intensity
+  render();
+}
+
+function toggleSound() {
+  settings.soundEnabled = document.getElementById('sound-toggle').checked;
+  if (settings.soundEnabled) {
+    playSound('bubble');
+  }
+}
+
+function changeTheme(themeName) {
+  settings.theme = themeName;
+  applyTheme(themeName);
+}
+
+function applyTheme(themeName) {
+  document.body.className = `theme-${themeName}`;
+}
+
+// Konami code: ↑ ↑ ↓ ↓ ← → ← → B A
+const KONAMI_SEQUENCE = ['ArrowUp', 'ArrowUp', 'ArrowDown', 'ArrowDown', 'ArrowLeft', 'ArrowRight', 'ArrowLeft', 'ArrowRight', 'b', 'a'];
+
+function checkKonamiCode(key) {
+  konamiCode.push(key);
+  if (konamiCode.length > KONAMI_SEQUENCE.length) {
+    konamiCode.shift();
+  }
+
+  if (konamiCode.join(',') === KONAMI_SEQUENCE.join(',')) {
+    activateKonamiMode();
+    konamiCode = [];
+  }
+}
+
+function activateKonamiMode() {
+  alert('🎮 KONAMI CODE ACTIVATED! Philip mode: MAXIMUM OVERDRIVE! 🐟');
+  settings.philipIntensity = 1.0;
+  saveState();
+  render();
+  window.location.hash = '#konami';
 }
 
 // Hidden test controls
@@ -336,9 +792,11 @@ function showPrevFact() {
   render();
 }
 
-// Keyboard shortcuts for testing:
-// Press 'N' for next fact, 'P' for previous fact, 'R' to reset to today's fact
+// Event listeners
 document.addEventListener('keydown', e => {
+  checkKonamiCode(e.key.toLowerCase());
+
+  // Debug shortcuts
   if (e.key === 'n' || e.key === 'N') {
     showNextFact();
   } else if (e.key === 'p' || e.key === 'P') {
@@ -349,18 +807,29 @@ document.addEventListener('keydown', e => {
   }
 });
 
-// Cleanup timer on page unload to prevent memory leaks
+window.addEventListener('hashchange', loadFromPermalink);
+
 window.addEventListener('beforeunload', () => {
+  // Save total time
+  stats.totalTimeMs += Date.now() - stats.sessionStart;
+  saveState();
+
+  // Cleanup timer
   if (timerInterval) {
     clearInterval(timerInterval);
   }
 });
 
-// Load saved state or generate new fact
+// Click outside modal to close
+window.onclick = (event) => {
+  if (event.target.classList.contains('modal')) {
+    event.target.classList.add('hidden');
+  }
+};
+
+// Initialize
 loadState();
-
-// Initial render
+loadFromPermalink();
 render();
-
-// Update countdown every second
+updateRandomButtonState();
 timerInterval = setInterval(updateCountdown, COUNTDOWN_UPDATE_INTERVAL_MS);
