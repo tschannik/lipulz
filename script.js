@@ -889,7 +889,12 @@ window.addEventListener('beforeunload', () => {
 // Click outside modal to close
 window.onclick = (event) => {
   if (event.target.classList.contains('modal')) {
+    const modalId = event.target.id;
     event.target.classList.add('hidden');
+    // Save state when closing settings
+    if (modalId === 'settings-modal') {
+      saveState();
+    }
   }
 };
 
@@ -904,6 +909,49 @@ function init() {
       console.error('Required DOM elements not found');
       return;
     }
+
+    // Add event listeners for toolbar buttons
+    const randomBtn = document.getElementById('random-fact-btn');
+    const archiveBtn = document.getElementById('archive-btn');
+    const statsBtn = document.getElementById('stats-btn');
+    const settingsBtn = document.getElementById('settings-btn');
+
+    if (randomBtn) randomBtn.addEventListener('click', showRandomFact);
+    if (archiveBtn) archiveBtn.addEventListener('click', showArchive);
+    if (statsBtn) statsBtn.addEventListener('click', showStats);
+    if (settingsBtn) settingsBtn.addEventListener('click', showSettings);
+
+    // Add event listeners for modal close buttons
+    document.querySelectorAll('.close-btn').forEach(btn => {
+      btn.addEventListener('click', function() {
+        const modalId = this.getAttribute('data-close');
+        if (modalId) {
+          const modal = document.getElementById(modalId);
+          if (modal) {
+            modal.classList.add('hidden');
+            // Save state when closing settings
+            if (modalId === 'settings-modal') {
+              saveState();
+            }
+          }
+        }
+      });
+    });
+
+    // Add event listeners for settings controls
+    const soundToggle = document.getElementById('sound-toggle');
+    const philipSlider = document.getElementById('philip-slider');
+    const themeSelect = document.getElementById('theme-select');
+    const archiveSearch = document.getElementById('archive-search');
+
+    if (soundToggle) soundToggle.addEventListener('change', toggleSound);
+    if (philipSlider) philipSlider.addEventListener('input', function() {
+      updatePhilipIntensity(this.value);
+    });
+    if (themeSelect) themeSelect.addEventListener('change', function() {
+      changeTheme(this.value);
+    });
+    if (archiveSearch) archiveSearch.addEventListener('input', showArchive);
 
     // Initialize application
     loadState();

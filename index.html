@@ -37,10 +37,10 @@
       </div>
 
       <div class="toolbar">
-        <button id="random-fact-btn" onclick="showRandomFact()" class="btn">🎲 Random Fact</button>
-        <button onclick="showArchive()" class="btn">📚 Archive</button>
-        <button onclick="showStats()" class="btn">📊 Stats</button>
-        <button onclick="showSettings()" class="btn">⚙️ Settings</button>
+        <button id="random-fact-btn" class="btn">🎲 Random Fact</button>
+        <button id="archive-btn" class="btn">📚 Archive</button>
+        <button id="stats-btn" class="btn">📊 Stats</button>
+        <button id="settings-btn" class="btn">⚙️ Settings</button>
       </div>
     </header>
 
@@ -53,7 +53,7 @@
       <div class="modal-content">
         <div class="modal-header">
           <h2>Share This Fact</h2>
-          <button class="close-btn" onclick="closeShareModal()">×</button>
+          <button class="close-btn" data-close="share-modal">×</button>
         </div>
         <div class="modal-body">
           <button id="share-twitter" class="btn btn-block">Share on Twitter</button>
@@ -68,7 +68,7 @@
       <div class="modal-content modal-large">
         <div class="modal-header">
           <h2>Fact Archive</h2>
-          <button class="close-btn" onclick="closeArchive()">×</button>
+          <button class="close-btn" data-close="archive-modal">×</button>
         </div>
         <div class="modal-body">
           <input
@@ -76,7 +76,6 @@
             id="archive-search"
             placeholder="Search facts..."
             class="search-input"
-            oninput="showArchive()"
           />
           <div id="archive-content" class="archive-content"></div>
         </div>
@@ -88,7 +87,7 @@
       <div class="modal-content">
         <div class="modal-header">
           <h2>Your Statistics</h2>
-          <button class="close-btn" onclick="closeStats()">×</button>
+          <button class="close-btn" data-close="stats-modal">×</button>
         </div>
         <div class="modal-body">
           <div class="stat-item">
@@ -120,13 +119,13 @@
       <div class="modal-content">
         <div class="modal-header">
           <h2>Settings</h2>
-          <button class="close-btn" onclick="closeSettings()">×</button>
+          <button class="close-btn" data-close="settings-modal">×</button>
         </div>
         <div class="modal-body">
           <div class="setting-item">
             <label for="sound-toggle">
               <span>🔊 Sound Effects</span>
-              <input type="checkbox" id="sound-toggle" onchange="toggleSound()" />
+              <input type="checkbox" id="sound-toggle" />
             </label>
           </div>
 
@@ -140,7 +139,6 @@
               min="0"
               max="100"
               value="92"
-              oninput="updatePhilipIntensity(this.value)"
               class="slider"
             />
             <div class="slider-labels">
@@ -153,7 +151,7 @@
             <label for="theme-select">
               <span>🎨 Theme</span>
             </label>
-            <select id="theme-select" onchange="changeTheme(this.value)" class="theme-select">
+            <select id="theme-select" class="theme-select">
               <option value="default">Default Ocean</option>
               <option value="deep-sea">Deep Sea</option>
               <option value="coral-reef">Coral Reef</option>
