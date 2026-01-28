@@ -1,0 +1,15 @@
+{
+  "name": "lipulz-fish-facts",
+  "version": "1.0.0",
+  "description": "365 Fish Facts (Featuring Philip) - a small vanilla JS web app.",
+  "private": true,
+  "scripts": {
+    "dev": "serve -l 8080 .",
+    "start": "serve -l 8080 ."
+  },
+  "devDependencies": {
+    "serve": "^14.2.3"
+  }
+}
+
+

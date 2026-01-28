@@ -102,6 +102,23 @@ For testing purposes, the following keyboard shortcuts are available:
 
 ## Deployment
 
+## Local Development
+
+For quick local testing without Docker, you can use any simple static file server.
+
+### Option 1: Python HTTP server (no extra dependencies)
+
+From the project root:
+
+```bash
+cd /Users/yannik/Repos/Personal/lipulz.net
+python -m http.server 8080
+```
+
+Then open `http://localhost:8080` in your browser.
+
+### Option 2: Using Docker
+
 ### Docker
 
 Build and run using Docker:
