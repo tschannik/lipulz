@@ -36,9 +36,12 @@
         <div id="millennium-indicator" class="hidden millennium-badge">🌌 MILLENNIUM HOUR 🌌</div>
       </div>
 
+      <div id="achievement-header-icons" class="achievement-header-icons" aria-label="Unlocked achievements" aria-live="polite"></div>
+
       <div class="toolbar">
         <button id="random-fact-btn" class="btn">🎲 Random Fact</button>
         <button id="archive-btn" class="btn">📚 Archive</button>
+        <button id="deck-btn" class="btn">⭐ Deck</button>
         <button id="stats-btn" class="btn">📊 Stats</button>
         <button id="settings-btn" class="btn">⚙️ Settings</button>
       </div>
@@ -89,27 +92,86 @@
           <h2>Your Statistics</h2>
           <button class="close-btn" data-close="stats-modal">×</button>
         </div>
-        <div class="modal-body">
+        <div class="modal-body" id="stats-modal-body">
           <div class="stat-item">
-            <span class="stat-label">Facts Seen:</span>
+            <span class="stat-label">
+              Facts Seen
+              <span class="stat-help" title="How many unique facts you have seen so far, out of 365.">?</span>
+            </span>
             <span id="stat-seen" class="stat-value">0 / 365</span>
           </div>
+          <div class="progress-bar">
+            <div id="progress-seen" class="progress-bar-fill"></div>
+          </div>
           <div class="stat-item">
-            <span class="stat-label">Favorites:</span>
+            <span class="stat-label">
+              Favorites
+              <span class="stat-help" title="How many facts you have starred as favorites.">?</span>
+            </span>
             <span id="stat-favorites" class="stat-value">0</span>
           </div>
           <div class="stat-item">
-            <span class="stat-label">Total Time:</span>
+            <span class="stat-label">
+              Total Time
+              <span class="stat-help" title="Approximate total time you have spent on this site across sessions.">?</span>
+            </span>
             <span id="stat-time" class="stat-value">0s</span>
           </div>
           <div class="stat-item">
-            <span class="stat-label">Streak:</span>
+            <span class="stat-label">
+              Streak
+              <span class="stat-help" title="How many consecutive days you have visited at least once.">?</span>
+            </span>
             <span id="stat-streak" class="stat-value">0 days</span>
           </div>
+          <div class="progress-bar">
+            <div id="progress-streak" class="progress-bar-fill"></div>
+          </div>
           <div class="stat-item">
-            <span class="stat-label">Philip Exposure:</span>
+            <span class="stat-label">
+              Philip Exposure
+              <span class="stat-help" title="How often Philip commentary appears in your facts, based on your Philip Intensity setting.">?</span>
+            </span>
             <span id="stat-philip" class="stat-value">92%</span>
           </div>
+
+          <div id="achievements-section">
+            <h3 class="achievements-heading">Achievements</h3>
+            <div id="achievements-list" class="achievements-list"></div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Deck / Collection Modal -->
+    <div id="deck-modal" class="modal hidden">
+      <div class="modal-content modal-large">
+        <div class="modal-header">
+          <h2>Your Deck</h2>
+          <button class="close-btn" data-close="deck-modal">×</button>
+        </div>
+        <div class="modal-body">
+          <div class="deck-filters">
+            <label>
+              Tag
+              <select id="deck-tag-filter" class="theme-select">
+                <option value="">All tags</option>
+              </select>
+            </label>
+            <label class="deck-filter-checkbox">
+              <input type="checkbox" id="deck-filter-special" />
+              Special dates
+            </label>
+            <label class="deck-filter-checkbox">
+              <input type="checkbox" id="deck-filter-ultra" />
+              Ultra Philip
+            </label>
+            <label class="deck-filter-checkbox">
+              <input type="checkbox" id="deck-filter-millennium" />
+              Millennium
+            </label>
+          </div>
+          <div id="deck-content" class="archive-content"></div>
         </div>
       </div>
     </div>
@@ -164,6 +226,9 @@
         </div>
       </div>
     </div>
+
+    <!-- Toast container -->
+    <div id="toast-container" aria-live="polite" aria-atomic="true"></div>
 
     <script src="script.js"></script>
   </body>

@@ -268,7 +268,6 @@ function getUltraPhilipFact(rng) {
 // State management (initialized after DOM loads)
 let wrap;
 let countdownEl;
-let randomCooldownEl;
 let activeModal = null;
 let lastFocusedBeforeModal = null;
 
@@ -793,23 +792,16 @@ function showRandomFact() {
 function updateRandomButtonState() {
   const btn = document.getElementById('random-fact-btn');
   if (!btn) return;
-  const cooldownText = document.getElementById('random-cooldown-text');
 
   const now = Date.now();
   if (now < randomFactCooldownUntil) {
     btn.disabled = true;
     const seconds = Math.ceil((randomFactCooldownUntil - now) / 1000);
     btn.textContent = `Cooldown: ${seconds}s`;
-    if (cooldownText) {
-      cooldownText.textContent = `Next random in ${seconds}s`;
-    }
     setTimeout(updateRandomButtonState, 1000);
   } else {
     btn.disabled = false;
     btn.textContent = '🎲 Random Fact';
-    if (cooldownText) {
-      cooldownText.textContent = '';
-    }
   }
 }
 
@@ -1164,101 +1156,6 @@ function closeSettings() {
   closeModal('settings-modal');
 }
 
-// Export / Import Data
-function exportData() {
-  try {
-    const exportData = {
-      version: STATE_VERSION,
-      exportDate: new Date().toISOString(),
-      settings: settings,
-      stats: stats,
-      seed: seed,
-      currentFactIndex: currentFactIndex,
-      factGeneratedAt: factGeneratedAt,
-    };
-
-    const dataStr = JSON.stringify(exportData, null, 2);
-    const dataBlob = new Blob([dataStr], { type: 'application/json' });
-    const url = URL.createObjectURL(dataBlob);
-
-    const link = document.createElement('a');
-    link.href = url;
-    link.download = `fish-facts-backup-${new Date().toISOString().split('T')[0]}.json`;
-    document.body.appendChild(link);
-    link.click();
-    document.body.removeChild(link);
-    URL.revokeObjectURL(url);
-
-    showToast('Data exported successfully!', 'success');
-  } catch (error) {
-    console.error('Export error:', error);
-    showToast('Failed to export data.', 'error');
-  }
-}
-
-function importData() {
-  try {
-    const input = document.createElement('input');
-    input.type = 'file';
-    input.accept = 'application/json,.json';
-
-    input.onchange = (e) => {
-      const file = e.target.files[0];
-      if (!file) return;
-
-      const reader = new FileReader();
-      reader.onload = (event) => {
-        try {
-          const importedData = JSON.parse(event.target.result);
-
-          // Validate data structure
-          if (!importedData.version || !importedData.stats || !importedData.settings) {
-            throw new Error('Invalid backup file format');
-          }
-
-          // Confirm before overwriting
-          if (!confirm('This will replace all your current data. Continue?')) {
-            return;
-          }
-
-          // Import data
-          settings = { ...settings, ...importedData.settings };
-          stats = { ...stats, ...importedData.stats };
-          seed = importedData.seed || seed;
-          currentFactIndex = importedData.currentFactIndex || 0;
-          factGeneratedAt = importedData.factGeneratedAt || getHourStart();
-
-          // Apply imported theme
-          if (settings.theme) {
-            applyTheme(settings.theme);
-          }
-
-          saveState();
-          render();
-          updateStatsDisplay();
-
-          showToast('Data imported successfully!', 'success');
-          closeModal('settings-modal');
-        } catch (error) {
-          console.error('Import parse error:', error);
-          showToast('Failed to import data. Invalid file format.', 'error');
-        }
-      };
-
-      reader.onerror = () => {
-        showToast('Failed to read file.', 'error');
-      };
-
-      reader.readAsText(file);
-    };
-
-    input.click();
-  } catch (error) {
-    console.error('Import error:', error);
-    showToast('Failed to import data.', 'error');
-  }
-}
-
 function updatePhilipIntensity(value) {
   try {
     settings.philipIntensity = value / 100;
@@ -1374,7 +1271,6 @@ function init() {
     // Get DOM elements
     wrap = document.getElementById('wrap');
     countdownEl = document.getElementById('countdown');
-    randomCooldownEl = document.getElementById('random-cooldown-text');
 
     if (!wrap || !countdownEl) {
       console.error('Required DOM elements not found');
@@ -1409,8 +1305,6 @@ function init() {
     const philipSlider = document.getElementById('philip-slider');
     const themeSelect = document.getElementById('theme-select');
     const archiveSearch = document.getElementById('archive-search');
-    const exportBtn = document.getElementById('export-data-btn');
-    const importBtn = document.getElementById('import-data-btn');
 
     if (soundToggle) soundToggle.addEventListener('change', toggleSound);
     if (philipSlider) philipSlider.addEventListener('input', function() {
@@ -1420,8 +1314,6 @@ function init() {
       changeTheme(this.value);
     });
     if (archiveSearch) archiveSearch.addEventListener('input', showArchive);
-    if (exportBtn) exportBtn.addEventListener('click', exportData);
-    if (importBtn) importBtn.addEventListener('click', importData);
 
     // Add event listeners for deck filters
     const deckTagFilter = document.getElementById('deck-tag-filter');
