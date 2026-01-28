@@ -223,9 +223,9 @@ function getUltraPhilipFact(rng) {
   return null;
 }
 
-// State management
-const wrap = document.getElementById('wrap');
-const countdownEl = document.getElementById('countdown');
+// State management (initialized after DOM loads)
+let wrap;
+let countdownEl;
 
 let seed = Date.now() >>> 0;
 let currentFactIndex = 0;
@@ -383,6 +383,8 @@ function playSound(soundName) {
 }
 
 function updateCountdown() {
+  if (!countdownEl) return;
+
   const now = Date.now();
   const nextHourStart = new Date(now);
   nextHourStart.setHours(nextHourStart.getHours() + 1);
@@ -447,6 +449,7 @@ function getCurrentFact() {
 }
 
 function render() {
+  if (!wrap) return;
   wrap.innerHTML = '';
   const f = getCurrentFact();
 
@@ -592,28 +595,35 @@ function showShareModal(fact) {
 }
 
 function closeShareModal() {
-  document.getElementById('share-modal').classList.add('hidden');
+  const modal = document.getElementById('share-modal');
+  if (modal) modal.classList.add('hidden');
 }
 
 // Random fact with cooldown
 function showRandomFact() {
-  const now = Date.now();
-  if (now < randomFactCooldownUntil) {
-    const remaining = Math.ceil((randomFactCooldownUntil - now) / 1000);
-    alert(`Please wait ${remaining} seconds before generating another random fact.`);
-    return;
-  }
+  try {
+    const now = Date.now();
+    if (now < randomFactCooldownUntil) {
+      const remaining = Math.ceil((randomFactCooldownUntil - now) / 1000);
+      alert(`Please wait ${remaining} seconds before generating another random fact.`);
+      return;
+    }
 
-  currentFactIndex = Math.floor(Math.random() * 365);
-  randomFactCooldownUntil = now + RANDOM_FACT_COOLDOWN_MS;
-  playSound('bloop');
-  saveState();
-  render();
-  updateRandomButtonState();
+    currentFactIndex = Math.floor(Math.random() * 365);
+    randomFactCooldownUntil = now + RANDOM_FACT_COOLDOWN_MS;
+    playSound('bloop');
+    saveState();
+    render();
+    updateRandomButtonState();
+  } catch (error) {
+    console.error('Error showing random fact:', error);
+  }
 }
 
 function updateRandomButtonState() {
   const btn = document.getElementById('random-fact-btn');
+  if (!btn) return;
+
   const now = Date.now();
   if (now < randomFactCooldownUntil) {
     btn.disabled = true;
@@ -627,11 +637,18 @@ function updateRandomButtonState() {
 
 // Archive modal
 function showArchive() {
-  const modal = document.getElementById('archive-modal');
-  const archiveContent = document.getElementById('archive-content');
-  archiveContent.innerHTML = '';
+  try {
+    const modal = document.getElementById('archive-modal');
+    const archiveContent = document.getElementById('archive-content');
+    const archiveSearch = document.getElementById('archive-search');
 
-  const search = document.getElementById('archive-search').value.toLowerCase();
+    if (!modal || !archiveContent || !archiveSearch) {
+      console.error('Archive elements not found');
+      return;
+    }
+
+    archiveContent.innerHTML = '';
+    const search = archiveSearch.value.toLowerCase();
 
   // Show all facts
   for (let i = 0; i < 365; i++) {
@@ -689,21 +706,34 @@ function showArchive() {
   }
 
   modal.classList.remove('hidden');
+  } catch (error) {
+    console.error('Error showing archive:', error);
+  }
 }
 
 function closeArchive() {
-  document.getElementById('archive-modal').classList.add('hidden');
+  const modal = document.getElementById('archive-modal');
+  if (modal) modal.classList.add('hidden');
 }
 
 // Stats modal
 function showStats() {
-  const modal = document.getElementById('stats-modal');
-  modal.classList.remove('hidden');
-  updateStatsDisplay();
+  try {
+    const modal = document.getElementById('stats-modal');
+    if (!modal) {
+      console.error('Stats modal not found');
+      return;
+    }
+    modal.classList.remove('hidden');
+    updateStatsDisplay();
+  } catch (error) {
+    console.error('Error showing stats:', error);
+  }
 }
 
 function closeStats() {
-  document.getElementById('stats-modal').classList.add('hidden');
+  const modal = document.getElementById('stats-modal');
+  if (modal) modal.classList.add('hidden');
 }
 
 function updateStatsDisplay() {
@@ -713,39 +743,75 @@ function updateStatsDisplay() {
   const totalTime = stats.totalTimeMs + sessionTime;
   const philipExposure = Math.round(settings.philipIntensity * 100);
 
-  document.getElementById('stat-seen').textContent = `${totalSeen} / 365`;
-  document.getElementById('stat-favorites').textContent = totalFavorites;
-  document.getElementById('stat-time').textContent = formatTime(totalTime);
-  document.getElementById('stat-streak').textContent = `${stats.streak} days`;
-  document.getElementById('stat-philip').textContent = `${philipExposure}%`;
+  const statSeen = document.getElementById('stat-seen');
+  const statFavorites = document.getElementById('stat-favorites');
+  const statTime = document.getElementById('stat-time');
+  const statStreak = document.getElementById('stat-streak');
+  const statPhilip = document.getElementById('stat-philip');
+
+  if (statSeen) statSeen.textContent = `${totalSeen} / 365`;
+  if (statFavorites) statFavorites.textContent = totalFavorites;
+  if (statTime) statTime.textContent = formatTime(totalTime);
+  if (statStreak) statStreak.textContent = `${stats.streak} days`;
+  if (statPhilip) statPhilip.textContent = `${philipExposure}%`;
 }
 
 // Settings modal
 function showSettings() {
-  const modal = document.getElementById('settings-modal');
-  document.getElementById('sound-toggle').checked = settings.soundEnabled;
-  document.getElementById('philip-slider').value = settings.philipIntensity * 100;
-  document.getElementById('philip-value').textContent = `${Math.round(settings.philipIntensity * 100)}%`;
-  document.getElementById('theme-select').value = settings.theme;
-  modal.classList.remove('hidden');
+  try {
+    const modal = document.getElementById('settings-modal');
+    const soundToggle = document.getElementById('sound-toggle');
+    const philipSlider = document.getElementById('philip-slider');
+    const philipValue = document.getElementById('philip-value');
+    const themeSelect = document.getElementById('theme-select');
+
+    if (!modal) {
+      console.error('Settings modal not found');
+      return;
+    }
+
+    if (soundToggle) soundToggle.checked = settings.soundEnabled;
+    if (philipSlider) philipSlider.value = settings.philipIntensity * 100;
+    if (philipValue) philipValue.textContent = `${Math.round(settings.philipIntensity * 100)}%`;
+    if (themeSelect) themeSelect.value = settings.theme;
+
+    modal.classList.remove('hidden');
+  } catch (error) {
+    console.error('Error showing settings:', error);
+  }
 }
 
 function closeSettings() {
-  document.getElementById('settings-modal').classList.add('hidden');
+  const modal = document.getElementById('settings-modal');
+  if (modal) modal.classList.add('hidden');
   saveState();
 }
 
 function updatePhilipIntensity(value) {
-  settings.philipIntensity = value / 100;
-  document.getElementById('philip-value').textContent = `${Math.round(value)}%`;
-  // Regenerate current fact with new intensity
-  render();
+  try {
+    settings.philipIntensity = value / 100;
+    const philipValue = document.getElementById('philip-value');
+    if (philipValue) {
+      philipValue.textContent = `${Math.round(value)}%`;
+    }
+    // Regenerate current fact with new intensity
+    render();
+  } catch (error) {
+    console.error('Error updating Philip intensity:', error);
+  }
 }
 
 function toggleSound() {
-  settings.soundEnabled = document.getElementById('sound-toggle').checked;
-  if (settings.soundEnabled) {
-    playSound('bubble');
+  try {
+    const soundToggle = document.getElementById('sound-toggle');
+    if (soundToggle) {
+      settings.soundEnabled = soundToggle.checked;
+      if (settings.soundEnabled) {
+        playSound('bubble');
+      }
+    }
+  } catch (error) {
+    console.error('Error toggling sound:', error);
   }
 }
 
@@ -827,9 +893,32 @@ window.onclick = (event) => {
   }
 };
 
-// Initialize
-loadState();
-loadFromPermalink();
-render();
-updateRandomButtonState();
-timerInterval = setInterval(updateCountdown, COUNTDOWN_UPDATE_INTERVAL_MS);
+// Initialize when DOM is ready
+function init() {
+  try {
+    // Get DOM elements
+    wrap = document.getElementById('wrap');
+    countdownEl = document.getElementById('countdown');
+
+    if (!wrap || !countdownEl) {
+      console.error('Required DOM elements not found');
+      return;
+    }
+
+    // Initialize application
+    loadState();
+    loadFromPermalink();
+    render();
+    updateRandomButtonState();
+    timerInterval = setInterval(updateCountdown, COUNTDOWN_UPDATE_INTERVAL_MS);
+  } catch (error) {
+    console.error('Initialization error:', error);
+  }
+}
+
+// Run init when DOM is ready
+if (document.readyState === 'loading') {
+  document.addEventListener('DOMContentLoaded', init);
+} else {
+  init();
+}
