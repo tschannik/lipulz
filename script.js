@@ -1,9 +1,10 @@
 // Constants
-const STATE_VERSION = 2; // Bumped for new features
+const STATE_VERSION = 3; // Bumped for new features (achievements, deck, export/import, UX)
 const HOUR_MS = 60 * 60 * 1000;
 const COUNTDOWN_UPDATE_INTERVAL_MS = 1000;
 const RANDOM_FACT_COOLDOWN_MS = 5 * 60 * 1000; // 5 minutes
 const MILLENNIUM_FACT_INTERVAL_HOURS = 1000;
+const STREAK_GOAL_DAYS = 30; // For progress bar visualization
 
 // Probability thresholds for content generation
 const DEFAULT_PHILIP_FREQUENCY = 0.92;
@@ -67,6 +68,47 @@ function mulberry32(seed) {
     t = (t + Math.imul(t ^ (t >>> 7), 61 | t)) ^ t;
     return ((t ^ (t >>> 14)) >>> 0) / 4294967296;
   };
+}
+
+// Achievement definitions
+const ACHIEVEMENTS = {
+  earlyFish: {
+    id: 'earlyFish',
+    icon: '🌅',
+    name: 'Early Fish',
+    description: 'Visited between 5–7am local time.',
+  },
+  ultraPhilipFinder: {
+    id: 'ultraPhilipFinder',
+    icon: '🌟',
+    name: 'Ultra Philip Finder',
+    description: 'Saw all ultra-rare Philip facts.',
+  },
+  justTheFacts: {
+    id: 'justTheFacts',
+    icon: '📘',
+    name: 'Just the Facts',
+    description: 'Kept Philip Intensity at 0% for 7 consecutive days.',
+  },
+};
+
+function getAchievementList() {
+  return Object.values(ACHIEVEMENTS);
+}
+
+function hasAchievement(id) {
+  return Array.isArray(stats.achievements) && stats.achievements.includes(id);
+}
+
+function awardAchievement(id) {
+  if (!ACHIEVEMENTS[id]) return;
+  if (!Array.isArray(stats.achievements)) {
+    stats.achievements = [];
+  }
+  if (!stats.achievements.includes(id)) {
+    stats.achievements.push(id);
+    saveState();
+  }
 }
 
 const BASE_FACTS = [
@@ -226,6 +268,9 @@ function getUltraPhilipFact(rng) {
 // State management (initialized after DOM loads)
 let wrap;
 let countdownEl;
+let randomCooldownEl;
+let activeModal = null;
+let lastFocusedBeforeModal = null;
 
 let seed = Date.now() >>> 0;
 let currentFactIndex = 0;
@@ -239,10 +284,14 @@ let settings = {
 let stats = {
   factsSeen: [],
   favorites: [],
+  favoriteMeta: {}, // { [factNum]: { tag, isSpecial, isUltra, isMillennium } }
   totalTimeMs: 0,
   lastVisit: Date.now(),
   streak: 0,
   sessionStart: Date.now(),
+  achievements: [], // unlocked achievement ids
+  justFactsStreak: 0, // consecutive days at 0% Philip intensity
+  ultraPhilipSeenTags: [], // which ultra Philip variants have been seen
 };
 let randomFactCooldownUntil = 0;
 let konamiCode = [];
@@ -291,9 +340,12 @@ function loadState() {
     // Migrate from older versions
     if (state.version < STATE_VERSION) {
       console.log('Migrating state from version', state.version, 'to', STATE_VERSION);
-      // Initialize new fields with defaults
       if (!state.settings) state.settings = settings;
       if (!state.stats) state.stats = stats;
+      if (!state.stats.favoriteMeta) state.stats.favoriteMeta = {};
+      if (!state.stats.achievements) state.stats.achievements = [];
+      if (typeof state.stats.justFactsStreak !== 'number') state.stats.justFactsStreak = 0;
+      if (!Array.isArray(state.stats.ultraPhilipSeenTags)) state.stats.ultraPhilipSeenTags = [];
     }
 
     // Restore settings and stats
@@ -351,6 +403,23 @@ function updateStreak() {
     } else if (dayDiff > 1) {
       stats.streak = 1;
     }
+
+    // Achievements: Early Fish (visit between 5–7am local time)
+    const visitHour = new Date(now).getHours();
+    if (visitHour >= 5 && visitHour < 7) {
+      awardAchievement('earlyFish');
+    }
+
+    // Achievements: Just the Facts (7 days at 0% Philip intensity)
+    if (settings.philipIntensity === 0) {
+      stats.justFactsStreak += 1;
+      if (stats.justFactsStreak >= 7) {
+        awardAchievement('justTheFacts');
+      }
+    } else {
+      stats.justFactsStreak = 0;
+    }
+
     stats.lastVisit = now;
     saveState();
   }
@@ -379,6 +448,28 @@ function playSound(soundName) {
     audio.play().catch(e => console.warn('Sound play failed:', e));
   } catch (e) {
     console.warn('Sound error:', e);
+  }
+}
+
+// Toast notifications
+function showToast(message, type = 'info', duration = 3000) {
+  try {
+    const container = document.getElementById('toast-container');
+    if (!container) return;
+
+    const toast = document.createElement('div');
+    toast.className = `toast toast-${type}`;
+    toast.textContent = message;
+
+    container.appendChild(toast);
+
+    setTimeout(() => {
+      if (toast.parentNode === container) {
+        container.removeChild(toast);
+      }
+    }, duration);
+  } catch (e) {
+    console.warn('Toast error:', e);
   }
 }
 
@@ -456,7 +547,28 @@ function render() {
   // Track fact in stats
   if (!stats.factsSeen.includes(f.n)) {
     stats.factsSeen.push(f.n);
+    // Cache metadata for favorites/deck
+    stats.favoriteMeta[f.n] = {
+      tag: f.tag,
+      isSpecial: !!f.isSpecial,
+      isUltra: !!f.isUltra,
+      isMillennium: !!f.isMillennium,
+    };
     saveState();
+  }
+
+  // Achievements: Ultra Philip Finder (saw all ultra-rare Philip facts)
+  if (f && f.isUltra) {
+    if (!Array.isArray(stats.ultraPhilipSeenTags)) {
+      stats.ultraPhilipSeenTags = [];
+    }
+    if (!stats.ultraPhilipSeenTags.includes(f.tag)) {
+      stats.ultraPhilipSeenTags.push(f.tag);
+      if (stats.ultraPhilipSeenTags.length >= ULTRA_PHILIP_FACTS.length) {
+        awardAchievement('ultraPhilipFinder');
+      }
+      saveState();
+    }
   }
 
   if (f) {
@@ -585,18 +697,76 @@ function showShareModal(fact) {
   };
 
   document.getElementById('share-copy').onclick = () => {
-    navigator.clipboard.writeText(`${factText}\n\n${url}`).then(() => {
-      alert('Copied to clipboard!');
-      modal.classList.add('hidden');
-    });
+    navigator.clipboard.writeText(`${factText}\n\n${url}`)
+      .then(() => {
+        showToast('Copied link and fact to clipboard!', 'success');
+        if (modal) {
+          modal.classList.add('hidden');
+        }
+      })
+      .catch(() => {
+        showToast('Failed to copy to clipboard.', 'error');
+      });
   };
 
-  modal.classList.remove('hidden');
+  if (modal) {
+    openModal('share-modal');
+  }
 }
 
 function closeShareModal() {
-  const modal = document.getElementById('share-modal');
-  if (modal) modal.classList.add('hidden');
+  closeModal('share-modal');
+}
+
+// Modal helpers for accessibility and state management
+function openModal(modalId) {
+  try {
+    const modal = document.getElementById(modalId);
+    if (!modal) {
+      console.error(`Modal ${modalId} not found`);
+      return;
+    }
+
+    // Store currently focused element
+    lastFocusedBeforeModal = document.activeElement;
+    activeModal = modalId;
+
+    modal.classList.remove('hidden');
+
+    // Focus first focusable element in modal
+    setTimeout(() => {
+      const focusable = modal.querySelectorAll('button, [href], input, select, textarea, [tabindex]:not([tabindex="-1"])');
+      if (focusable.length > 0) {
+        focusable[0].focus();
+      }
+    }, 100);
+  } catch (error) {
+    console.error('Error opening modal:', error);
+  }
+}
+
+function closeModal(modalId) {
+  try {
+    const modal = document.getElementById(modalId);
+    if (modal) {
+      modal.classList.add('hidden');
+    }
+
+    // Restore focus
+    if (lastFocusedBeforeModal && lastFocusedBeforeModal.focus) {
+      lastFocusedBeforeModal.focus();
+    }
+
+    activeModal = null;
+    lastFocusedBeforeModal = null;
+
+    // Save state when closing settings
+    if (modalId === 'settings-modal') {
+      saveState();
+    }
+  } catch (error) {
+    console.error('Error closing modal:', error);
+  }
 }
 
 // Random fact with cooldown
@@ -605,7 +775,7 @@ function showRandomFact() {
     const now = Date.now();
     if (now < randomFactCooldownUntil) {
       const remaining = Math.ceil((randomFactCooldownUntil - now) / 1000);
-      alert(`Please wait ${remaining} seconds before generating another random fact.`);
+      showToast(`Please wait ${remaining} seconds before generating another random fact.`, 'info');
       return;
     }
 
@@ -623,15 +793,23 @@ function showRandomFact() {
 function updateRandomButtonState() {
   const btn = document.getElementById('random-fact-btn');
   if (!btn) return;
+  const cooldownText = document.getElementById('random-cooldown-text');
 
   const now = Date.now();
   if (now < randomFactCooldownUntil) {
     btn.disabled = true;
-    btn.textContent = `Cooldown: ${Math.ceil((randomFactCooldownUntil - now) / 1000)}s`;
+    const seconds = Math.ceil((randomFactCooldownUntil - now) / 1000);
+    btn.textContent = `Cooldown: ${seconds}s`;
+    if (cooldownText) {
+      cooldownText.textContent = `Next random in ${seconds}s`;
+    }
     setTimeout(updateRandomButtonState, 1000);
   } else {
     btn.disabled = false;
     btn.textContent = '🎲 Random Fact';
+    if (cooldownText) {
+      cooldownText.textContent = '';
+    }
   }
 }
 
@@ -705,15 +883,152 @@ function showArchive() {
     archiveContent.appendChild(item);
   }
 
-  modal.classList.remove('hidden');
+  openModal('archive-modal');
   } catch (error) {
     console.error('Error showing archive:', error);
   }
 }
 
 function closeArchive() {
-  const modal = document.getElementById('archive-modal');
-  if (modal) modal.classList.add('hidden');
+  closeModal('archive-modal');
+}
+
+// Deck / Favorites Collection Modal
+function showDeck() {
+  try {
+    const modal = document.getElementById('deck-modal');
+    const deckContent = document.getElementById('deck-content');
+    const tagFilter = document.getElementById('deck-tag-filter');
+
+    if (!modal || !deckContent || !tagFilter) {
+      console.error('Deck elements not found');
+      return;
+    }
+
+    // Populate tag filter options
+    const allTags = new Set();
+    Object.values(stats.favoriteMeta || {}).forEach(meta => {
+      if (meta.tag) allTags.add(meta.tag);
+    });
+
+    tagFilter.innerHTML = '<option value="">All tags</option>';
+    Array.from(allTags).sort().forEach(tag => {
+      const option = document.createElement('option');
+      option.value = tag;
+      option.textContent = tag;
+      tagFilter.appendChild(option);
+    });
+
+    renderDeck();
+    openModal('deck-modal');
+  } catch (error) {
+    console.error('Error showing deck:', error);
+  }
+}
+
+function renderDeck() {
+  try {
+    const deckContent = document.getElementById('deck-content');
+    const tagFilter = document.getElementById('deck-tag-filter');
+    const filterSpecial = document.getElementById('deck-filter-special');
+    const filterUltra = document.getElementById('deck-filter-ultra');
+    const filterMillennium = document.getElementById('deck-filter-millennium');
+
+    if (!deckContent) return;
+
+    deckContent.innerHTML = '';
+
+    const favorites = stats.favorites || [];
+    if (favorites.length === 0) {
+      const empty = document.createElement('div');
+      empty.className = 'tiny';
+      empty.style.padding = '20px';
+      empty.style.textAlign = 'center';
+      empty.textContent = 'No favorites yet! Star some facts to add them to your deck.';
+      deckContent.appendChild(empty);
+      return;
+    }
+
+    const selectedTag = tagFilter ? tagFilter.value : '';
+    const showSpecial = filterSpecial ? filterSpecial.checked : false;
+    const showUltra = filterUltra ? filterUltra.checked : false;
+    const showMillennium = filterMillennium ? filterMillennium.checked : false;
+
+    favorites.forEach(factNum => {
+      const meta = stats.favoriteMeta[factNum] || {};
+      const fact = generateSingleFact(seed, factNum - 1, settings.philipIntensity);
+
+      // Apply filters
+      if (selectedTag && meta.tag !== selectedTag) return;
+      if (showSpecial && !meta.isSpecial) return;
+      if (showUltra && !meta.isUltra) return;
+      if (showMillennium && !meta.isMillennium) return;
+
+      const item = document.createElement('div');
+      item.className = 'archive-item favorite';
+
+      const header = document.createElement('div');
+      header.style.display = 'flex';
+      header.style.justifyContent = 'space-between';
+      header.style.marginBottom = '8px';
+
+      const title = document.createElement('strong');
+      let badges = '';
+      if (meta.isMillennium) badges += ' 🌌';
+      if (meta.isUltra) badges += ' ✨';
+      if (meta.isSpecial) badges += ' 🎉';
+      title.textContent = `#${String(factNum).padStart(3, '0')} - ${meta.tag || fact.tag}${badges}`;
+
+      const unfavBtn = document.createElement('button');
+      unfavBtn.textContent = '⭐';
+      unfavBtn.className = 'btn-small';
+      unfavBtn.style.cursor = 'pointer';
+      unfavBtn.title = 'Remove from favorites';
+      unfavBtn.onclick = () => {
+        toggleFavorite(factNum);
+        renderDeck();
+      };
+
+      header.appendChild(title);
+      header.appendChild(unfavBtn);
+
+      const text = document.createElement('p');
+      text.textContent = fact.text;
+      text.style.margin = '0';
+      text.style.fontSize = '0.9rem';
+
+      const viewBtn = document.createElement('button');
+      viewBtn.textContent = 'View';
+      viewBtn.className = 'btn-small';
+      viewBtn.style.marginTop = '8px';
+      viewBtn.onclick = () => {
+        currentFactIndex = factNum - 1;
+        render();
+        closeModal('deck-modal');
+      };
+
+      item.appendChild(header);
+      item.appendChild(text);
+      item.appendChild(viewBtn);
+
+      deckContent.appendChild(item);
+    });
+
+    if (deckContent.children.length === 0 && favorites.length > 0) {
+      const empty = document.createElement('div');
+      empty.className = 'tiny';
+      empty.style.padding = '20px';
+      empty.style.textAlign = 'center';
+      empty.textContent = 'No favorites match these filters.';
+      deckContent.appendChild(empty);
+    }
+  } catch (error) {
+    console.error('Error rendering deck:', error);
+  }
+}
+
+function closeDeck() {
+  closeModal('deck-modal');
 }
 
 // Stats modal
@@ -724,7 +1039,7 @@ function showStats() {
       console.error('Stats modal not found');
       return;
     }
-    modal.classList.remove('hidden');
+    openModal('stats-modal');
     updateStatsDisplay();
   } catch (error) {
     console.error('Error showing stats:', error);
@@ -732,8 +1047,7 @@ function showStats() {
 }
 
 function closeStats() {
-  const modal = document.getElementById('stats-modal');
-  if (modal) modal.classList.add('hidden');
+  closeModal('stats-modal');
 }
 
 function updateStatsDisplay() {
@@ -748,12 +1062,77 @@ function updateStatsDisplay() {
   const statTime = document.getElementById('stat-time');
   const statStreak = document.getElementById('stat-streak');
   const statPhilip = document.getElementById('stat-philip');
+  const progressSeen = document.getElementById('progress-seen');
+  const progressStreak = document.getElementById('progress-streak');
 
   if (statSeen) statSeen.textContent = `${totalSeen} / 365`;
   if (statFavorites) statFavorites.textContent = totalFavorites;
   if (statTime) statTime.textContent = formatTime(totalTime);
   if (statStreak) statStreak.textContent = `${stats.streak} days`;
   if (statPhilip) statPhilip.textContent = `${philipExposure}%`;
+
+  if (progressSeen) {
+    const pct = Math.max(0, Math.min(1, totalSeen / 365));
+    progressSeen.style.width = `${pct * 100}%`;
+  }
+  if (progressStreak) {
+    const pct = Math.max(0, Math.min(1, stats.streak / STREAK_GOAL_DAYS));
+    progressStreak.style.width = `${pct * 100}%`;
+  }
+
+  renderAchievementsUI();
+}
+
+function renderAchievementsUI() {
+  const listEl = document.getElementById('achievements-list');
+  const headerEl = document.getElementById('achievement-header-icons');
+  if (!listEl || !headerEl) return;
+
+  listEl.innerHTML = '';
+  headerEl.innerHTML = '';
+
+  const unlocked = getAchievementList().filter(a => hasAchievement(a.id));
+
+  if (unlocked.length === 0) {
+    const empty = document.createElement('div');
+    empty.className = 'tiny';
+    empty.textContent = 'No achievements unlocked yet. Keep exploring the deep.';
+    listEl.appendChild(empty);
+    return;
+  }
+
+  unlocked.forEach(ach => {
+    // Stats list badge
+    const badge = document.createElement('div');
+    badge.className = 'achievement-badge';
+
+    const icon = document.createElement('div');
+    icon.className = 'achievement-badge-icon';
+    icon.textContent = ach.icon;
+
+    const textWrap = document.createElement('div');
+    const title = document.createElement('div');
+    title.className = 'achievement-badge-title';
+    title.textContent = ach.name;
+
+    const desc = document.createElement('div');
+    desc.className = 'achievement-badge-desc';
+    desc.textContent = ach.description;
+
+    textWrap.appendChild(title);
+    textWrap.appendChild(desc);
+
+    badge.appendChild(icon);
+    badge.appendChild(textWrap);
+    listEl.appendChild(badge);
+
+    // Header icon
+    const headerIcon = document.createElement('div');
+    headerIcon.className = 'achievement-icon';
+    headerIcon.textContent = ach.icon;
+    headerIcon.title = `${ach.name} – ${ach.description}`;
+    headerEl.appendChild(headerIcon);
+  });
 }
 
 // Settings modal
@@ -775,16 +1154,109 @@ function showSettings() {
     if (philipValue) philipValue.textContent = `${Math.round(settings.philipIntensity * 100)}%`;
     if (themeSelect) themeSelect.value = settings.theme;
 
-    modal.classList.remove('hidden');
+    openModal('settings-modal');
   } catch (error) {
     console.error('Error showing settings:', error);
   }
 }
 
 function closeSettings() {
-  const modal = document.getElementById('settings-modal');
-  if (modal) modal.classList.add('hidden');
-  saveState();
+  closeModal('settings-modal');
+}
+
+// Export / Import Data
+function exportData() {
+  try {
+    const exportData = {
+      version: STATE_VERSION,
+      exportDate: new Date().toISOString(),
+      settings: settings,
+      stats: stats,
+      seed: seed,
+      currentFactIndex: currentFactIndex,
+      factGeneratedAt: factGeneratedAt,
+    };
+
+    const dataStr = JSON.stringify(exportData, null, 2);
+    const dataBlob = new Blob([dataStr], { type: 'application/json' });
+    const url = URL.createObjectURL(dataBlob);
+
+    const link = document.createElement('a');
+    link.href = url;
+    link.download = `fish-facts-backup-${new Date().toISOString().split('T')[0]}.json`;
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+    URL.revokeObjectURL(url);
+
+    showToast('Data exported successfully!', 'success');
+  } catch (error) {
+    console.error('Export error:', error);
+    showToast('Failed to export data.', 'error');
+  }
+}
+
+function importData() {
+  try {
+    const input = document.createElement('input');
+    input.type = 'file';
+    input.accept = 'application/json,.json';
+
+    input.onchange = (e) => {
+      const file = e.target.files[0];
+      if (!file) return;
+
+      const reader = new FileReader();
+      reader.onload = (event) => {
+        try {
+          const importedData = JSON.parse(event.target.result);
+
+          // Validate data structure
+          if (!importedData.version || !importedData.stats || !importedData.settings) {
+            throw new Error('Invalid backup file format');
+          }
+
+          // Confirm before overwriting
+          if (!confirm('This will replace all your current data. Continue?')) {
+            return;
+          }
+
+          // Import data
+          settings = { ...settings, ...importedData.settings };
+          stats = { ...stats, ...importedData.stats };
+          seed = importedData.seed || seed;
+          currentFactIndex = importedData.currentFactIndex || 0;
+          factGeneratedAt = importedData.factGeneratedAt || getHourStart();
+
+          // Apply imported theme
+          if (settings.theme) {
+            applyTheme(settings.theme);
+          }
+
+          saveState();
+          render();
+          updateStatsDisplay();
+
+          showToast('Data imported successfully!', 'success');
+          closeModal('settings-modal');
+        } catch (error) {
+          console.error('Import parse error:', error);
+          showToast('Failed to import data. Invalid file format.', 'error');
+        }
+      };
+
+      reader.onerror = () => {
+        showToast('Failed to read file.', 'error');
+      };
+
+      reader.readAsText(file);
+    };
+
+    input.click();
+  } catch (error) {
+    console.error('Import error:', error);
+    showToast('Failed to import data.', 'error');
+  }
 }
 
 function updatePhilipIntensity(value) {
@@ -840,7 +1312,7 @@ function checkKonamiCode(key) {
 }
 
 function activateKonamiMode() {
-  alert('🎮 KONAMI CODE ACTIVATED! Philip mode: MAXIMUM OVERDRIVE! 🐟');
+  showToast('🎮 Konami code activated! Philip mode: MAXIMUM OVERDRIVE! 🐟', 'info', 4000);
   settings.philipIntensity = 1.0;
   saveState();
   render();
@@ -890,10 +1362,8 @@ window.addEventListener('beforeunload', () => {
 window.onclick = (event) => {
   if (event.target.classList.contains('modal')) {
     const modalId = event.target.id;
-    event.target.classList.add('hidden');
-    // Save state when closing settings
-    if (modalId === 'settings-modal') {
-      saveState();
+    if (modalId) {
+      closeModal(modalId);
     }
   }
 };
@@ -904,6 +1374,7 @@ function init() {
     // Get DOM elements
     wrap = document.getElementById('wrap');
     countdownEl = document.getElementById('countdown');
+    randomCooldownEl = document.getElementById('random-cooldown-text');
 
     if (!wrap || !countdownEl) {
       console.error('Required DOM elements not found');
@@ -913,11 +1384,13 @@ function init() {
     // Add event listeners for toolbar buttons
     const randomBtn = document.getElementById('random-fact-btn');
     const archiveBtn = document.getElementById('archive-btn');
+    const deckBtn = document.getElementById('deck-btn');
     const statsBtn = document.getElementById('stats-btn');
     const settingsBtn = document.getElementById('settings-btn');
 
     if (randomBtn) randomBtn.addEventListener('click', showRandomFact);
     if (archiveBtn) archiveBtn.addEventListener('click', showArchive);
+    if (deckBtn) deckBtn.addEventListener('click', showDeck);
     if (statsBtn) statsBtn.addEventListener('click', showStats);
     if (settingsBtn) settingsBtn.addEventListener('click', showSettings);
 
@@ -926,14 +1399,7 @@ function init() {
       btn.addEventListener('click', function() {
         const modalId = this.getAttribute('data-close');
         if (modalId) {
-          const modal = document.getElementById(modalId);
-          if (modal) {
-            modal.classList.add('hidden');
-            // Save state when closing settings
-            if (modalId === 'settings-modal') {
-              saveState();
-            }
-          }
+          closeModal(modalId);
         }
       });
     });
@@ -943,6 +1409,8 @@ function init() {
     const philipSlider = document.getElementById('philip-slider');
     const themeSelect = document.getElementById('theme-select');
     const archiveSearch = document.getElementById('archive-search');
+    const exportBtn = document.getElementById('export-data-btn');
+    const importBtn = document.getElementById('import-data-btn');
 
     if (soundToggle) soundToggle.addEventListener('change', toggleSound);
     if (philipSlider) philipSlider.addEventListener('input', function() {
@@ -952,6 +1420,19 @@ function init() {
       changeTheme(this.value);
     });
     if (archiveSearch) archiveSearch.addEventListener('input', showArchive);
+    if (exportBtn) exportBtn.addEventListener('click', exportData);
+    if (importBtn) importBtn.addEventListener('click', importData);
+
+    // Add event listeners for deck filters
+    const deckTagFilter = document.getElementById('deck-tag-filter');
+    const deckFilterSpecial = document.getElementById('deck-filter-special');
+    const deckFilterUltra = document.getElementById('deck-filter-ultra');
+    const deckFilterMillennium = document.getElementById('deck-filter-millennium');
+
+    if (deckTagFilter) deckTagFilter.addEventListener('change', renderDeck);
+    if (deckFilterSpecial) deckFilterSpecial.addEventListener('change', renderDeck);
+    if (deckFilterUltra) deckFilterUltra.addEventListener('change', renderDeck);
+    if (deckFilterMillennium) deckFilterMillennium.addEventListener('change', renderDeck);
 
     // Initialize application
     loadState();
