@@ -1,0 +1,215 @@
+:root {
+  color-scheme: light dark;
+  --primary: #0ea5e9;
+  --primary-dark: #0284c7;
+  --bg-light: rgba(127, 127, 127, 0.04);
+  --border-light: rgba(127, 127, 127, 0.15);
+  --spacing-xs: 12px;
+  --spacing-sm: 16px;
+  --spacing-md: 24px;
+  --spacing-lg: 32px;
+  --spacing-xl: 48px;
+  --spacing-2xl: 64px;
+  --border-radius-sm: 999px;
+  --border-radius-lg: 24px;
+}
+
+@media (prefers-color-scheme: dark) {
+  :root {
+    --bg-light: rgba(127, 127, 127, 0.08);
+    --border-light: rgba(127, 127, 127, 0.2);
+  }
+}
+
+* {
+  box-sizing: border-box;
+}
+
+@keyframes fadeIn {
+  from {
+    opacity: 0;
+    transform: translateY(8px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+@keyframes slideInUp {
+  from {
+    opacity: 0;
+    transform: translateY(20px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+body {
+  font-family:
+    system-ui,
+    -apple-system,
+    Segoe UI,
+    Roboto,
+    Arial,
+    sans-serif,
+    Apple Color Emoji,
+    Segoe UI Emoji,
+    Segoe UI Symbol;
+  margin: 0;
+  padding: var(--spacing-lg) var(--spacing-md);
+  line-height: 1.6;
+  min-height: 100vh;
+  display: flex;
+  flex-direction: column;
+}
+
+header {
+  display: grid;
+  gap: var(--spacing-lg);
+  max-width: 720px;
+  margin: 0 auto var(--spacing-2xl) auto;
+  text-align: center;
+}
+
+h1 {
+  margin: 0;
+  font-size: 2.5rem;
+  font-weight: 700;
+  background: linear-gradient(135deg, var(--primary), var(--primary-dark));
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
+  background-clip: text;
+  line-height: 1.15;
+  animation: slideInUp 0.6s ease-out;
+}
+
+/* Fallback for browsers that don't support background-clip: text */
+@supports not (background-clip: text) {
+  h1 {
+    color: var(--primary);
+    background: none;
+    -webkit-text-fill-color: inherit;
+  }
+}
+
+.sub {
+  opacity: 0.65;
+  font-size: 1.1rem;
+  letter-spacing: -0.3px;
+  animation: slideInUp 0.6s ease-out 0.1s backwards;
+}
+
+.controls {
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  gap: var(--spacing-sm);
+  animation: slideInUp 0.6s ease-out 0.2s backwards;
+}
+
+#countdown {
+  font-weight: 700 !important;
+  font-size: 1.45rem;
+  color: var(--primary);
+  letter-spacing: -0.5px;
+}
+
+main {
+  flex: 1;
+  display: flex;
+  align-items: flex-start;
+  justify-content: center;
+  padding: 0 0 40px 0;
+}
+
+#wrap {
+  max-width: 720px;
+  width: 100%;
+  display: grid;
+  gap: 20px;
+}
+
+.card {
+  border: 2px solid var(--border-light);
+  border-radius: var(--border-radius-lg);
+  padding: var(--spacing-xl);
+  background: var(--bg-light);
+  backdrop-filter: blur(10px);
+  -webkit-backdrop-filter: blur(10px);
+  transition: all 0.4s cubic-bezier(0.4, 0, 0.2, 1);
+  animation: fadeIn 0.5s ease-out;
+}
+
+.card:hover {
+  border-color: var(--primary);
+  box-shadow: 0 16px 48px rgba(14, 165, 233, 0.12);
+  transform: translateY(-2px);
+}
+
+.meta {
+  display: flex;
+  gap: var(--spacing-sm);
+  flex-wrap: wrap;
+  align-items: center;
+  margin-bottom: 28px;
+  padding-bottom: 20px;
+  border-bottom: 1px solid var(--border-light);
+}
+
+.num {
+  font-variant-numeric: tabular-nums;
+  font-weight: 700;
+  color: var(--primary);
+  font-size: 1.1rem;
+}
+
+.tag {
+  font-size: 0.75rem;
+  padding: 6px 14px;
+  border-radius: var(--border-radius-sm);
+  border: 1.5px solid var(--primary);
+  color: var(--primary);
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.6px;
+}
+
+.emoji {
+  font-size: 2.4rem;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 2.4rem;
+  font-family:
+    Apple Color Emoji,
+    Segoe UI Emoji,
+    Segoe UI Symbol,
+    sans-serif;
+  line-height: 1;
+  flex-shrink: 0;
+}
+
+.fact {
+  margin: 0;
+  font-size: 1.3rem;
+  line-height: 1.8;
+  letter-spacing: -0.2px;
+  font-weight: 500;
+  color: inherit;
+}
+
+.tiny {
+  font-size: 0.9rem;
+  opacity: 0.55;
+  margin-top: var(--spacing-md);
+  padding-top: 20px;
+  border-top: 1px solid var(--border-light);
+  font-style: italic;
+}
+
+.hidden {
+  display: none;
+}
